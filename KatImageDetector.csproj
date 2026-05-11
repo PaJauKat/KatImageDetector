@@ -17,7 +17,7 @@
 
   <ItemGroup>
     <None Update="boton_objetivo.png">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
   </ItemGroup>
 

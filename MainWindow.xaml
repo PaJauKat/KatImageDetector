@@ -20,18 +20,50 @@
             <TextBlock x:Name="lblEstado" Text="Detenido" FontWeight="Medium" Foreground="#FF5252"/>
         </StackPanel>
 
+        
+        <!-- Cuadro de Imagenes -->
         <Border Grid.Row="1" BorderBrush="#333333" BorderThickness="2" CornerRadius="5" Background="#2D2D2D">
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="*"/>
-                    <RowDefinition Height="Auto"/>
-                </Grid.RowDefinitions>
+            <ItemsControl ItemsSource="{Binding Cards}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <UniformGrid Columns="2" />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
 
-                <Image Grid.Row="0" x:Name="imgResultado" Stretch="Uniform" Margin="0,0,0,5" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
-                <TextBlock Grid.Row="1" x:Name="coincidenceResult" Text="Result: --" Foreground="#EEEEEE" FontSize="10" HorizontalAlignment="Center" Margin="0,5,0,5"/>
-            </Grid>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border Margin="8" Background="#2D2D2D" BorderBrush="#333" BorderThickness="1" CornerRadius="6" Padding="8">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                
+                                <!--Titulo-->
+                                <TextBlock Text="{Binding Title}" Foreground="White" FontSize="14" Margin="0,0,0,6"/>
+                                <!--Imagen-->
+                                <Grid Grid.Row="1">
+                                    <Image Source="{Binding Image}" Stretch="Uniform" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="60000">
+                                        <Image.ToolTip>
+                                            <Border Background="#1E1E1E"  BorderBrush="#444" BorderThickness="2" Padding="10"  CornerRadius="6">
+                                                <Image Source="{Binding Image}" Width="800" Stretch="Uniform"/>
+                                            </Border>
+                                        </Image.ToolTip>
+                                    </Image>
+                                </Grid>
+                                <!--Resultado-->
+                                <TextBlock Grid.Row="2" Text="{Binding Resultado}" Foreground="White" FontSize="12" Margin="0,6,0,0" HorizontalAlignment="Center"/>
+
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+                
+            </ItemsControl>
         </Border>
 
+        <!-- Boton de Captura -->
         <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
             <Button x:Name="btnIniciar" Content="Capturar" Width="100" Height="35"
                     Background="#3E3E42" Foreground="#CCCCCC"
@@ -43,5 +75,7 @@
                 </Button.Resources>
             </Button>
         </StackPanel>
+        
+        
     </Grid>
 </Window>
