@@ -62,22 +62,34 @@ namespace KatImageDetector
             };
         }
 
-        internal static KatImageDetector.MainWindow.ImageCard CalcularAKAZE()
+        internal static KatImageDetector.MainWindow.ImageCard Calcular(Mat captura, Mat objetivo, DetectorType detectorType, MatcherType matcherType = MatcherType.BRUTE_FORCE)
         {
             var infos = new Collection<MainWindow.ImageInfo>();
 
-            using var captura = new Mat(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "pantallazo.png"), ImreadModes.Grayscale);
-            using var objetivo = new Mat(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "boton_objetivo.png"), ImreadModes.Grayscale);
 
-            using var sift = OpenCvSharp.Features2D.SIFT.Create();
+            using Feature2D detector = detectorType switch
+            {
+                DetectorType.ORB => OpenCvSharp.ORB.Create(),
+                DetectorType.AKAZE => OpenCvSharp.AKAZE.Create(),
+                DetectorType.OpenCV_TemplateMatching => throw new NotImplementedException(),
+                DetectorType.YOLO => throw new NotImplementedException(),
+                DetectorType.SIFT => OpenCvSharp.Features2D.SIFT.Create(),
+                _ => throw new NotSupportedException($"Detector type {detectorType} is not supported.")
+            };
 
             using var capturaDescriptors = new Mat();
-            sift.DetectAndCompute(captura, null, out var keypointsCaptura, capturaDescriptors);
+            detector.DetectAndCompute(captura, null, out var keypointsCaptura, capturaDescriptors);
             using var objetivoDescriptors = new Mat();
-            sift.DetectAndCompute(objetivo, null, out var keypointsObjetivo, objetivoDescriptors);
+            detector.DetectAndCompute(objetivo, null, out var keypointsObjetivo, objetivoDescriptors);
 
+            using DescriptorMatcher matcher = matcherType switch
+            {
+                MatcherType.BRUTE_FORCE => new OpenCvSharp.BFMatcher(NormTypes.Hamming, crossCheck: false),
+                MatcherType.FLANN => detectorType == DetectorType.SIFT ? 
+                    new OpenCvSharp.FlannBasedMatcher(new KDTreeIndexParams(5), new SearchParams(50)) : throw new NotSupportedException($"FLANN matcher is only supported for SIFT."),
+                _ => throw new NotSupportedException($"Matcher type {matcherType} is not supported.")
+            };
 
-            using var matcher = new FlannBasedMatcher(new KDTreeIndexParams(5), new SearchParams(50));
             DMatch[][] matches = matcher.KnnMatch(objetivoDescriptors, capturaDescriptors, 2);
 
             var goodMatches = new List<DMatch>();
@@ -97,7 +109,6 @@ namespace KatImageDetector
                 result);
 
 
-
             infos.Add(new MainWindow.ImageInfo
             {
                 Image = result.ToBitmapSource(),
@@ -107,8 +118,8 @@ namespace KatImageDetector
             return new MainWindow.ImageCard
             {
                 ImagenesInfo = infos,
-                Title = "SIFT",
-                Type = DetectorType.SIFT
+                Title = detectorType.ToString(),
+                Type = detectorType
             };
         }
     }
