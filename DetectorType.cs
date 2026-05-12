@@ -12,6 +12,6 @@ namespace KatImageDetector
         ORB,
         AKAZE,
         YOLO,
-        SURF
+        SIFT
     }
 }

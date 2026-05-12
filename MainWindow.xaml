@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:KatImageDetector"
         mc:Ignorable="d"
-        Title="KatImageDetector" Height="350" Width="450" Background="#1E1E1E">
+        Title="KatImageDetector" Height="1000" Width="1200" Background="#1E1E1E">
     <Grid Margin="20">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -32,7 +32,8 @@
 
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
-                        <Border Margin="8" Background="#2D2D2D" BorderBrush="#333" BorderThickness="1" CornerRadius="6" Padding="8">
+                        <Border Margin="8" Background="#2D2D2D" BorderBrush="#333" BorderThickness="1" CornerRadius="6" Padding="8"
+                                MouseDown="Card_MouseDown">
                             <Grid>
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto"/>
@@ -44,16 +45,16 @@
                                 <TextBlock Text="{Binding Title}" Foreground="White" FontSize="14" Margin="0,0,0,6"/>
                                 <!--Imagen-->
                                 <Grid Grid.Row="1">
-                                    <Image Source="{Binding Image}" Stretch="Uniform" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="60000">
+                                    <Image Source="{Binding CurrentImage.Image}" Stretch="Uniform" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="60000">
                                         <Image.ToolTip>
                                             <Border Background="#1E1E1E"  BorderBrush="#444" BorderThickness="2" Padding="10"  CornerRadius="6">
-                                                <Image Source="{Binding Image}" Width="800" Stretch="Uniform"/>
+                                                <Image Source="{Binding CurrentImage.Image}" Width="800" Stretch="Uniform"/>
                                             </Border>
                                         </Image.ToolTip>
                                     </Image>
                                 </Grid>
                                 <!--Resultado-->
-                                <TextBlock Grid.Row="2" Text="{Binding Resultado}" Foreground="White" FontSize="12" Margin="0,6,0,0" HorizontalAlignment="Center"/>
+                                <TextBlock Grid.Row="2" Text="{Binding CurrentImage.Resultado}" Foreground="White" FontSize="12" Margin="0,6,0,0" HorizontalAlignment="Center"/>
 
                             </Grid>
                         </Border>

@@ -4,6 +4,7 @@ using Emgu.CV.Features2D;
 using Emgu.CV.Structure;
 using Emgu.CV.Util;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Windows;
@@ -20,21 +21,37 @@ namespace KatImageDetector
     public partial class MainWindow : Window
     {
 
-        public class ImageCard
+        public class ImageCard : INotifyPropertyChanged
         {
-            public string Title { get; set; }
+            public string? Title { get; set; }
             public DetectorType Type { get; set; }
             public Collection<ImageInfo> ImagenesInfo { get; set; } = [];
+
+            public int _currentIndex = 0;
+
+            public ImageInfo? CurrentImage => ImagenesInfo.Count == 0 ? null : ImagenesInfo[_currentIndex];
+
+            public void Update2NextImage()
+            {
+                Debug.WriteLine("Updated");
+                if (ImagenesInfo.Count == 0) return;
+                _currentIndex = (_currentIndex + 1) % ImagenesInfo.Count;
+
+                //avisar a la UI que cambió la imagen actual (si usas INotifyPropertyChanged, dispara el evento aquí)
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CurrentImage)));
+
+            }
+
+            public event PropertyChangedEventHandler? PropertyChanged;
         }
 
         public class ImageInfo
         {
-            public BitmapSource Image { get; set; }
-            public string Resultado { get; set; }
+            public required BitmapSource Image { get; set; }
+            public required string Resultado { get; set; }
         }
 
         public ObservableCollection<ImageCard> Cards { get; set; } = new();
-        public Popup _popup;
 
         public MainWindow()
         {
@@ -53,43 +70,15 @@ namespace KatImageDetector
             btnIniciar.Content = "Capturar";
         }
 
-        private async void ImgThumb_MouseEnter(object sender, System.Windows.Input.MouseEventArgs e)
+        private void Card_MouseDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
         {
-            if (sender is System.Windows.Controls.Image image)
+            Debug.WriteLine("Card Clicked");
+            if (sender is Border border && border.DataContext is ImageCard card)
             {
-                Grid grid = (Grid)VisualTreeHelper.GetParent(image);
-                if (grid == null)
-                {
-                    return;
-                }
-
-                Popup popup = (Popup)VisualTreeHelper.GetChild(grid, 1);
-                if (popup == null)
-                {
-                    return;
-                }
-                popup.IsOpen = true;
+                card.Update2NextImage();
             }
         }
 
-        private async void ImgThumb_MouseLeave(object sender, System.Windows.Input.MouseEventArgs e)
-        {
-            if (sender is System.Windows.Controls.Image image)
-            {
-                Grid grid = (Grid)VisualTreeHelper.GetParent(image);
-                if (grid == null)
-                {
-                    return;
-                }
-
-                Popup popup = (Popup)VisualTreeHelper.GetChild(grid, 1);
-                if (popup == null)
-                {
-                    return;
-                }
-                popup.IsOpen = false;
-            }
-        }
 
         private async Task EscanearPantalla()
         {
@@ -99,32 +88,157 @@ namespace KatImageDetector
             using Mat objetivo = CvInvoke.Imread(pathImgObjetivo, ImreadModes.Grayscale);
             using var objetivoMod = new Mat();
             CvInvoke.MedianBlur(objetivo,objetivoMod, 3);
+            //CvInvoke.Canny(objetivoMod, objetivoMod, 100, 200);
 
-            using Mat? captura = CapturarPantalla();
+            //using Mat? captura = CapturarPantalla();
+            using Mat captura = CvInvoke.Imread(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "pantallazo.png"), ImreadModes.Grayscale);
             if (captura == null)
             {
                 Debug.WriteLine("Captura fallida");
                 return;
             }
 
-            using var capturaMod = new Mat();
-            CvInvoke.CvtColor(captura, capturaMod, ColorConversion.Bgr2Gray);
+            using var capturaMod = new Mat(captura, new Rectangle(0, 0, captura.Width / 4, captura.Height / 4));
+            //CvInvoke.Canny(capturaMod, capturaMod, 100, 200);
 
             ImageCard resultado = CalcularTemplateMatching(capturaMod, objetivoMod);            
             ImageCard rORB = CalcularORB(capturaMod, objetivoMod);
-            using var capturaMod2 = new Mat(capturaMod, new Rectangle(0, 0, capturaMod.Width / 2, capturaMod.Height));
-            ImageCard rAKAZE = CalcularAKAZE(capturaMod2, objetivoMod);
+            ImageCard rAKAZE = CalcularAKAZE(capturaMod, objetivoMod);
+            ImageCard rSIFT = SinEmgu.CalcularSIFT();
             Dispatcher.Invoke(() =>
             {
                 Cards.Add(resultado);
                 Cards.Add(rORB);
                 Cards.Add(rAKAZE);
+                Cards.Add(rSIFT);
             });
 
         }
 
+        private static ImageCard CalcularSIFT(Mat capturaOriginal, Mat referencia)
+        {
+            Debug.WriteLine("------------------------------");
+            var infos = new Collection<ImageInfo>();
+            var sift = new Emgu.CV.Features2D.SIFT();
+
+            //Imagen de referencia
+            var referenceKp = new VectorOfKeyPoint();
+            using var refDescriptors = new Mat();
+            sift.DetectAndCompute(referencia, null, referenceKp, refDescriptors, false);
+
+            //Imagen de captura
+            var capturaKp = new VectorOfKeyPoint();
+            using var capturaDescriptors = new Mat();
+            sift.DetectAndCompute(capturaOriginal, null, capturaKp, capturaDescriptors, false);
+
+            //Matching con FLANN
+            var matcher = new Emgu.CV.Features2D.FlannBasedMatcher(new Emgu.CV.Flann.KdTreeIndexParams(5), new Emgu.CV.Flann.SearchParams(50));
+            var matches = new VectorOfVectorOfDMatch();
+            matcher.KnnMatch(refDescriptors, capturaDescriptors, matches, k: 2);
+            Debug.WriteLine($"SIFT - Matches encontrados: {matches.Size}");
+
+            //Aplicar ratio test de Lowe
+            var goodMatches = new VectorOfDMatch();
+            var tempMatches = new List<MDMatch>();
+
+            for (int i = 0; i < matches.Size; i++)
+            {
+                var matchRow = matches[i];
+                if (matchRow.Size >= 2)
+                {
+                    if (matchRow[0].Distance < 0.7 * matchRow[1].Distance)
+                    {
+                        //goodMatches.Push(new MDMatch[] { matchArray[0] });
+                        tempMatches.Add(matchRow[0]);
+                    }
+                }
+            }
+
+            goodMatches.Push(tempMatches.ToArray());
+
+            // DrawMatches para visualizar los buenos matches
+            using var result = new Mat();
+            try
+            {
+                Emgu.CV.Features2D.Features2DToolbox.DrawMatches(
+                    referencia, referenceKp,
+                    capturaOriginal, capturaKp,
+                    goodMatches,
+                    result,
+                    new MCvScalar(0, 255, 0),
+                    new MCvScalar(255, 0, 0),
+                    null,
+                    Emgu.CV.Features2D.Features2DToolbox.KeypointDrawType.Default
+                );
+
+                infos.Add(new ImageInfo
+                    {
+                        Image = Mat2BitmapSource(result),
+                        Resultado = "Matches buenos: " + goodMatches.Size
+                    });
+
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("Error dibujando matches para SIFT: " + ex.Message);
+            }
+
+
+            //Homografia
+            using var capturaCopy = capturaOriginal.Clone();
+            if (goodMatches.Size >= 4)
+            {
+                Debug.WriteLine($"SIFT - Calculando homografía con {goodMatches.Size} buenos matches...");
+                using Mat homography = Features2DToolbox.GetHomographyMatrixFromMatchedFeatures(
+                    referenceKp, capturaKp, matches, null, 5
+                    );
+                if (homography != null)
+                {
+                    //Limites del objeto
+                    var rect = new Rectangle(System.Drawing.Point.Empty, referencia.Size);
+                    PointF[] objCorners = new PointF[]
+                    {
+                        new PointF(rect.Left, rect.Top),
+                        new PointF(rect.Right, rect.Top),
+                        new PointF(rect.Right, rect.Bottom),
+                        new PointF(rect.Left, rect.Bottom)
+                    };
+                    objCorners = CvInvoke.PerspectiveTransform(objCorners, homography);
+                    for (int i = 0; i < 4; i++)
+                    {
+                        CvInvoke.Line(
+                            capturaCopy,
+                            System.Drawing.Point.Round(objCorners[i]),
+                            System.Drawing.Point.Round(objCorners[(i + 1) % 4]),
+                            new MCvScalar(0, 255, 0),
+                            2);
+                    }
+
+                    infos.Add(new ImageInfo
+                    {
+                        Image = Mat2BitmapSource(capturaCopy),
+                        Resultado = "Matches buenos: " + goodMatches.Size
+                    });
+                }
+            }
+            else
+            {
+                Debug.WriteLine($"SIFT - No se encontraron suficientes matches buenos para homografía (encontrados: {goodMatches.Size})");
+            }
+
+            return new ImageCard
+            {
+                Title = "SIFT",
+                ImagenesInfo = infos,
+                Type = DetectorType.SIFT
+             };
+        }
+                        
+
         private static ImageCard CalcularAKAZE(Mat capturaOriginal, Mat referencia)
         {
+
+            Debug.WriteLine("------------------------------");
             var akaze = new Emgu.CV.Features2D.AKAZE();
 
             //Imagen de referencia
@@ -148,7 +262,7 @@ namespace KatImageDetector
             var goodMatches = new VectorOfDMatch();
             for (int i = 0; i < matches.Size; i++)
             {
-                using var matchRow = matches[i];
+                var matchRow = matches[i];
                 if (matchRow.Size >= 2)
                 {
                     var matchArray = matchRow.ToArray();
@@ -159,12 +273,15 @@ namespace KatImageDetector
                 }
             }
 
+
+            using var capturaCopy = capturaOriginal.Clone();
             //Imprimiendo
             Debug.WriteLine($"AKAZE - Keypoints referencia: {referenceKp.Size}, Keypoints captura: {capturaKp.Size}");
 
             //Homografia
             if (goodMatches.Size >= 4)
             {
+                Debug.WriteLine($"AKAZE - Calculando homografía con {goodMatches.Size} buenos matches...");
                 using Mat homography = Features2DToolbox.GetHomographyMatrixFromMatchedFeatures(
                     referenceKp, capturaKp, matches, null, 5
                     );
@@ -187,7 +304,7 @@ namespace KatImageDetector
                     for (int i = 0; i < 4; i++)
                     {
                         CvInvoke.Line(
-                            capturaOriginal, 
+                            capturaCopy, 
                             System.Drawing.Point.Round(objCorners[i]),
                             System.Drawing.Point.Round(objCorners[(i + 1) % 4]), 
                             new MCvScalar(0, 255, 0), 
@@ -204,7 +321,7 @@ namespace KatImageDetector
                 Debug.WriteLine($"AKAZE - No se encontraron suficientes matches buenos para homografía (encontrados: {goodMatches.Size})");
             }
 
-            /*
+            
             using var result = new Mat();
             try
             {
@@ -223,13 +340,27 @@ namespace KatImageDetector
             {
                 Debug.WriteLine("Error dibujando matches para AKAZE: " + ex.Message);
             }
-            */
+            
+
+            var infos = new Collection<ImageInfo>();
+            infos.Add(new ImageInfo
+            {
+                Image = Mat2BitmapSource(capturaCopy),
+                Resultado = "Matches buenos: " + goodMatches.Size
+            });
+            
+            infos.Add(new ImageInfo
+            {
+                Image = Mat2BitmapSource(result),
+                Resultado = "Matches: " + matches.Size + ", Matches buenos: " + goodMatches.Size
+            });
+
+
 
             return new ImageCard
             {
                 Title = "AKAZE",
-                Image = Mat2BitmapSource(capturaOriginal),
-                Resultado = "Matches buenos: " + goodMatches.Length,
+                ImagenesInfo = infos,
                 Type = DetectorType.AKAZE
             };
 
@@ -238,6 +369,7 @@ namespace KatImageDetector
 
         private static ImageCard CalcularORB(Mat capturaOriginal, Mat referencia)
         {
+            Debug.WriteLine("------------------------------");
             var orb = new Emgu.CV.Features2D.ORB(500);
 
             //Imagen referencia
@@ -257,7 +389,7 @@ namespace KatImageDetector
             if (desc1 == null || desc1.IsEmpty || desc2 == null || desc2.IsEmpty)
             {
                 Debug.WriteLine("Descriptors vacíos → ORB no encontró features");
-                return new ImageCard { Title = "ORB", Resultado = "Sin features", Type = DetectorType.ORB };
+                return new ImageCard { Title = "ORB", ImagenesInfo = [], Type = DetectorType.ORB };
             }
 
             //Matching
@@ -269,7 +401,7 @@ namespace KatImageDetector
             if (matches.Size == 0)
             {
                 Debug.WriteLine("No matches returned by KnnMatch");
-                return new ImageCard { Title = "ORB", Resultado = "No matches", Type = DetectorType.ORB };
+                return new ImageCard { Title = "ORB", ImagenesInfo = [], Type = DetectorType.ORB };
             }
 
             //Aplicar ratio test de Lowe
@@ -297,7 +429,6 @@ namespace KatImageDetector
             using var result = new Mat();
             try
             {
-
                 Emgu.CV.Features2D.Features2DToolbox.DrawMatches(
                     referencia, kp1,
                     capturaOriginal, kp2,
@@ -316,15 +447,21 @@ namespace KatImageDetector
             return new ImageCard
             {
                 Title = "ORB",
-                Image = Mat2BitmapSource(result),
-                Resultado = "Matches buenos: " + goodMatches.Length,
-                Type = DetectorType.ORB
+                Type = DetectorType.ORB,
+                ImagenesInfo =
+                [
+                    new ImageInfo
+                    {
+                        Image = Mat2BitmapSource(result),
+                        Resultado = "Matches buenos: " + goodMatches.Size
+                    }
+                ]
             };
-
         }
 
         private static ImageCard CalcularTemplateMatching(Mat capturaOriginal, Mat objetivo)
         {
+            Debug.WriteLine("------------------------------");
             using Mat result = new();
             using Mat captura = capturaOriginal.Clone();
 
@@ -338,20 +475,26 @@ namespace KatImageDetector
             var rect = new System.Drawing.Rectangle(maxLocation, objetivo.Size);
             CvInvoke.Rectangle(captura, rect, new MCvScalar(0, 0, 255), 2);
 
-            var rutaOutput = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
-                "KatLol",
-                DateTime.Now.ToString("yyyyMMdd_HHmmss") + "_resultado.png"
-                );
-            captura.Save(rutaOutput);
-            Debug.WriteLine("Resultado guardado en:" + rutaOutput);
+            //var rutaOutput = Path.Combine(
+            //    Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
+            //    "KatLol",
+            //    DateTime.Now.ToString("yyyyMMdd_HHmmss") + "_resultado.png"
+            //    );
+            //captura.Save(rutaOutput);
+            //Debug.WriteLine("Resultado guardado en:" + rutaOutput);
             var bitmapSource = Mat2BitmapSource(captura);
 
             return new ImageCard
             {
                 Title = "Simple MatchTemplate",
-                Image = bitmapSource,
-                Resultado = "Coincidencia: " + maxValue.ToString("F4"),
+                ImagenesInfo =
+                [
+                    new ImageInfo
+                    {
+                        Image = bitmapSource,
+                        Resultado = "Coincidencia: " + maxValue.ToString("F4")
+                    }
+                ],
                 Type = DetectorType.OpenCV_TemplateMatching
             };
         }
