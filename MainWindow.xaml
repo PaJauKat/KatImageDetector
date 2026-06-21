@@ -42,7 +42,64 @@
                                 </Grid.RowDefinitions>
                                 
                                 <!--Titulo-->
-                                <TextBlock Text="{Binding Title}" Foreground="White" FontSize="14" Margin="0,0,0,6"/>
+                                <TextBlock Grid.Column="0" Text="{Binding Title}" Foreground="White" FontSize="14" Margin="0,0,0,6"/>
+
+                                <!-- Contenedor Dinámico de Pestañas (Arriba a la derecha) -->
+                                <ListBox Grid.Row="0" 
+                                         ItemsSource="{Binding ImagenesInfo}" 
+                                         SelectedItem="{Binding CurrentImage}" 
+                                         HorizontalAlignment="Right"
+                                         Background="Transparent" 
+                                         BorderThickness="0"
+                                         ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+
+                                    <ListBox.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <StackPanel Orientation="Horizontal"/>
+                                        </ItemsPanelTemplate>
+                                    </ListBox.ItemsPanel>
+
+                                    <ListBox.ItemContainerStyle>
+                                        <Style TargetType="ListBoxItem">
+                                            <Setter Property="Padding" Value="0"/>
+                                            <Setter Property="Margin" Value="2,0,0,5"/>
+                                            <Setter Property="Template">
+                                                <Setter.Value>
+                                                    <ControlTemplate TargetType="ListBoxItem">
+                                                        <!-- El Border cambia de color según si está seleccionado -->
+                                                        <Border x:Name="TabBorder" 
+                                                                Background="#3E3E3E" 
+                                                                CornerRadius="3" 
+                                                                Padding="6,2">
+                                                            <ContentPresenter />
+                                                        </Border>
+                                                        <ControlTemplate.Triggers>
+                                                            <!-- TRIGGER: Cuando esta es la pestaña actual -->
+                                                            <Trigger Property="IsSelected" Value="True">
+                                                                <Setter TargetName="TabBorder" Property="Background" Value="#555555"/>
+                                                                <!-- Gris más claro -->
+                                                                <Setter TargetName="TabBorder" Property="BorderBrush" Value="#007ACC"/>
+                                                                <!-- Opcional: Borde azul -->
+                                                                <Setter TargetName="TabBorder" Property="BorderThickness" Value="0,0,0,2"/>
+                                                            </Trigger>
+                                                        </ControlTemplate.Triggers>
+                                                    </ControlTemplate>
+                                                </Setter.Value>
+                                            </Setter>
+                                        </Style>
+                                    </ListBox.ItemContainerStyle>
+
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding Label}" 
+                                                       Foreground="White" 
+                                                       FontSize="9" 
+                                                       FontWeight="Bold"/>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+
+
                                 <!--Imagen-->
                                 <Grid Grid.Row="1">
                                     <Image Source="{Binding CurrentImage.Image}" Stretch="Uniform" ToolTipService.InitialShowDelay="0" ToolTipService.ShowDuration="60000">

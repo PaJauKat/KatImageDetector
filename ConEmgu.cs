@@ -77,7 +77,7 @@ namespace KatImageDetector
                 infos.Add(new ImageInfo
                 {
                     Image = Mat2BitmapSource(result),
-                    Resultado = "Matches buenos: " + goodMatches.Size
+                    TextoInfo = "Matches buenos: " + goodMatches.Size
                 });
 
             }
@@ -120,7 +120,7 @@ namespace KatImageDetector
                     infos.Add(new ImageInfo
                     {
                         Image = Mat2BitmapSource(capturaCopy),
-                        Resultado = "Matches buenos: " + goodMatches.Size
+                        TextoInfo = "Matches buenos: " + goodMatches.Size
                     });
                 }
             }
@@ -248,13 +248,13 @@ namespace KatImageDetector
             infos.Add(new ImageInfo
             {
                 Image = Mat2BitmapSource(capturaCopy),
-                Resultado = "Matches buenos: " + goodMatches.Size
+                TextoInfo = "Matches buenos: " + goodMatches.Size
             });
 
             infos.Add(new ImageInfo
             {
                 Image = Mat2BitmapSource(result),
-                Resultado = "Matches: " + matches.Size + ", Matches buenos: " + goodMatches.Size
+                TextoInfo = "Matches: " + matches.Size + ", Matches buenos: " + goodMatches.Size
             });
 
 
@@ -355,7 +355,7 @@ namespace KatImageDetector
                     new ImageInfo
                     {
                         Image = Mat2BitmapSource(result),
-                        Resultado = "Matches buenos: " + goodMatches.Size
+                        TextoInfo = "Matches buenos: " + goodMatches.Size
                     }
                 ]
             };
@@ -394,7 +394,7 @@ namespace KatImageDetector
                     new ImageInfo
                     {
                         Image = bitmapSource,
-                        Resultado = "Coincidencia: " + maxValue.ToString("F4")
+                        TextoInfo = "Coincidencia: " + maxValue.ToString("F4")
                     }
                 ],
                 Type = DetectorType.OpenCV_TemplateMatching

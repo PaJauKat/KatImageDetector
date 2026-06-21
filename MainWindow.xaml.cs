@@ -24,8 +24,18 @@ namespace KatImageDetector
 
             public int _currentIndex = 0;
 
-            public ImageInfo? CurrentImage => ImagenesInfo.Count == 0 ? null : ImagenesInfo[_currentIndex];
-
+            public ImageInfo? CurrentImage {
+                get => ImagenesInfo.Count == 0 ? null : ImagenesInfo [_currentIndex];
+                set {                     
+                    if (value == null) return;
+                    var index = ImagenesInfo.IndexOf(value);
+                    if (index != -1)
+                    {
+                        _currentIndex = index;
+                        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CurrentImage)));
+                    }
+                }
+            }
             public void Update2NextImage()
             {
                 Debug.WriteLine("Updated");
@@ -43,7 +53,8 @@ namespace KatImageDetector
         public class ImageInfo
         {
             public required BitmapSource Image { get; set; }
-            public required string Resultado { get; set; }
+            public required string TextoInfo { get; set; }
+            public string Label { get; set; } = "img";
         }
 
         public ObservableCollection<ImageCard> Cards { get; set; } = new();

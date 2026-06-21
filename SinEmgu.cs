@@ -52,7 +52,7 @@ namespace KatImageDetector
           
             infos.Add(new MainWindow.ImageInfo { 
                 Image = result.ToBitmapSource(),
-                Resultado = $"GoodMatches: {goodMatches.Count}"
+                TextoInfo = $"GoodMatches: {goodMatches.Count}"
             });
 
             return new MainWindow.ImageCard { 
@@ -101,6 +101,7 @@ namespace KatImageDetector
                 }
             }
 
+            // Agregando la imagen con los matches dibujados
             using var result = new Mat();
             Cv2.DrawMatches(
                 objetivo, keypointsObjetivo,
@@ -112,8 +113,59 @@ namespace KatImageDetector
             infos.Add(new MainWindow.ImageInfo
             {
                 Image = result.ToBitmapSource(),
-                Resultado = $"GoodMatches: {goodMatches.Count}"
+                TextoInfo = $"GoodMatches: {goodMatches.Count}",
+                Label = "Matches"
             });
+
+            // Agregando la homografia si es posible
+            if (goodMatches.Count >= 4)
+            {
+                var srcPts = OpenCvSharp.InputArray.Create(goodMatches.Select(x => keypointsObjetivo[x.QueryIdx].Pt).ToArray());
+                var dstPts = OpenCvSharp.InputArray.Create(goodMatches.Select(x => keypointsCaptura[x.TrainIdx].Pt).ToArray());
+
+                using var mask = new Mat();
+
+                using Mat homography = Cv2.FindHomography(
+                    srcPts,
+                    dstPts,
+                    method: HomographyMethods.Ransac,
+                    mask: mask
+                    );
+
+                if (homography != null)
+                {
+                    using var warped = new Mat();
+                    Cv2.WarpPerspective(objetivo, warped, homography, new OpenCvSharp.Size(captura.Width, captura.Height));
+
+                    infos.Add(new MainWindow.ImageInfo
+                    {
+                        Image = warped.ToBitmapSource(),
+                        TextoInfo = "Homography calculated successfully.",
+                        Label = "Warped"
+                    });
+
+                    Point2f[] objCorners =
+                    [
+                        new(0,0),
+                        new(objetivo.Width, 0),
+                        new(objetivo.Width, objetivo.Height),
+                        new(0, objetivo.Height)
+                    ];
+
+                    // Projectando los puntos con la homografia en la captura
+                    Point2f[] capturaCorners = Cv2.PerspectiveTransform(objCorners, homography);
+                    using var capturaCopy = captura.Clone();
+                    Cv2.Polylines(capturaCopy, [capturaCorners.Select(x => x.ToPoint()).ToArray()], true, Scalar.Green);
+
+                    infos.Add(new MainWindow.ImageInfo
+                    {
+                        Image = capturaCopy.ToBitmapSource(),
+                        TextoInfo = $"Inliers: {Cv2.CountNonZero(mask)}, Ratio: {(double) Cv2.CountNonZero(mask)/goodMatches.Count}",
+                        Label = "Homography"
+                    });
+                }
+            }
+            
 
             return new MainWindow.ImageCard
             {
